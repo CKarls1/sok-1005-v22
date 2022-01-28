@@ -44,45 +44,42 @@ Lower_Stratosphere <- fread("https://www.nsstc.uah.edu/data/msu/v6.0/tls/uahncdc
 
 Lower_Troposphere <- subset(Lower_Troposphere, select =c(Year,Mo,NoPol)) %>%
   filter(Year != max(Year), Year != min(Year))%>%
-  mutate(Atmosfære_nivå = "Lower_Troposphere")
+  mutate(Atmosfæren = "Nedre troposfære")
 
 Mid_Troposphere <- subset(Mid_Troposphere, select =c(Year,Mo,NoPol)) %>%
   filter(Year != max(Year), Year != min(Year)) %>%
-  mutate(Atmosfære_nivå = "Mid_Troposhere")
+  mutate(Atmosfæren = "Midt troposfæren")
 
 Tropopause <- subset(Tropopause, select =c(Year,Mo,NoPol)) %>%
   filter(Year != max(Year), Year != min(Year)) %>%
-  mutate(Atmosfære_nivå = "Tropopause")
+  mutate(Atmosfæren = "Troposfæren")
 
 Lower_Stratosphere <- subset(Lower_Stratosphere, select =c(Year,Mo,NoPol)) %>%
-  mutate(Atmosfære_nivå = "Lower_Stratosphere")
-
-Lower_Stratosphere <- Lower_Stratosphere %>%
+  mutate(Atmosfæren = "Nedre stratosfære") %>%
   mutate_all(as.character)
 
-Tabell <- bind_rows(Lower_Troposphere, Mid_Troposphere,
-                    Tropopause, Lower_Stratosphere)
+Tabell <- bind_rows(Lower_Troposphere, Mid_Troposphere, Tropopause, Lower_Stratosphere)
 
 Tabell$NoPol <- as.numeric(Tabell$NoPol)
 
 Tabell <- Tabell %>%
-  mutate(tempmean = rollmean(NoPol, k=13, fill=NA, align ='right'),
+  mutate('Rullerende Gjennomsnitt' = rollmean(NoPol, k=13, fill=NA, align ='right'), 
          Dato = as.yearmon(paste(Tabell$Year, Tabell$Mo), "%Y %m")) 
+
 Tabell$Dato <- as.Date(Tabell$Dato)
 
-ggplot(Tabell,aes(x = Dato, y = NoPol, color = Atmosfære_nivå)) +
+ggplot(Tabell,aes(x = Dato, y = NoPol, color = Atmosfæren)) +
   geom_path(size = 0.5) +
-  geom_point(size = 1) +
   geom_hline(yintercept = 0) +
   theme_bw()+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  xlab("År") +
+  xlab("År") + 
   ylab("Tempraturer") + 
   ggtitle("Varierende tempraturer fra 60 grader til 90 grader Nord") +
   theme(plot.title = element_text(hjust = 0.5, size = 13)) +
   theme(axis.title.x = element_text(hjust = 0.5, size = 6)) +
   theme(axis.title.y = element_text(hjust = 0.5, size = 11)) +
-  geom_line(color ="black", aes(y = Tabell$tempmean)) +
+  geom_line(aes(y=Tabell$'Rullerende Gjennomsnitt', color = 'Rullerende Gjennomsnitt' )) +
   scale_x_date(date_breaks = '1 year', date_labels = "%Y") +
-  scale_y_continuous(breaks=scales::breaks_pretty(n=20),
-                     expand = expansion(add = 1))
+  scale_y_continuous(breaks=scales::breaks_pretty(n=20), expand = expansion(add = 1))
+
