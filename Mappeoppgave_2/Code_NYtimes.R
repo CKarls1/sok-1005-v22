@@ -14,6 +14,8 @@ Raw_data <- fromJSON("https://static01.nyt.com/newsgraphics/2021/12/20/us-corona
 Raw_data <- Raw_data %>% 
   mutate(statskode = state.abb[match(name,state.name)])
 
+
+
 #setter inn DC manuelt siden den kommer som NA
 Raw_data[is.na(Raw_data)]= '.D.C.'
 
