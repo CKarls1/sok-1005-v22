@@ -23,7 +23,7 @@ Raw_data[is.na(Raw_data)]= '.D.C.'
 plot <- ggplot(Raw_data, aes(x = fully_vaccinated_pct_of_pop, y = deaths_per_100k)) + 
   geom_point(colour = "palegreen3") + 
   geom_text(aes(label = statskode),hjust=0, vjust=-1.5, size = 3) +
-  labs(title = "Andel av befolkning som er fullvaksinert","Antall døde per 100.000") +
+  labs(title = "Andel av befolkning som er fullvaksinert","Antall døde per 100.000", y = " Dødsfall per 100.000", x = "Prosentandel fullvaksinerte av befolkning") +
   ggtitle("20 måndelige døde i gjennomsnitt pr 100.000") + 
   scale_x_continuous(labels = scales::percent, limits=c(0.45, 0.80), breaks=seq(0.45, 0.80, by = 0.05)) + 
   theme_bw() + 
@@ -42,8 +42,10 @@ plot
 
 ## oppgave 2
 
-# finner confidensintervallet
-lm(deaths_per_100k ~ fully_vaccinated_pct_of_pop, data = Raw_data)
+# finner Coefficient intervallet
+summary(lm(deaths_per_100k ~ fully_vaccinated_pct_of_pop, data = Raw_data))
+
+# dette viser oss at for hver prosent økning i vaksine er det en anslått nedgang i 36,663 døde per 100.000
 
 # setter inn i grafen 
 plot +
