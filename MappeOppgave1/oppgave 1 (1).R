@@ -82,4 +82,4 @@ ggplot(Tabell,aes(x = Dato, y = NoPol, color = Atmosfæren)) +
   geom_line(aes(y=Tabell$'Rullerende Gjennomsnitt', color = 'Rullerende Gjennomsnitt' )) +
   scale_x_date(date_breaks = '1 year', date_labels = "%Y") +
   scale_y_continuous(breaks=scales::breaks_pretty(n=20), expand = expansion(add = 1))
-
+hhh
