@@ -29,6 +29,9 @@ Tabell_1 <- "https://www.motor.no/aktuelt/motors-store-vintertest-av-rekkevidde-
   theme_minimal()
 
 
+
+
+
 ggplotly(Tabell_1) #henter tabellen gjennom ggplotly for å kunne se hvilke data hver enkelt plott har. 
 
 
