@@ -10,7 +10,7 @@ library(plotly)
 # inspirert av 
 # https://stackoverflow.com/questions/52722846/how-can-i-remove-non-numeric-characters-from-strings-using-gsub-in-r?fbclid=IwAR0pKhomymoThSLBaWiVTaDGudQOTg4WxOc3A6mkvmhNICA-0hi8VZfkZSQ
 # https://www.opencodez.com/how-to-guide/how-to-use-xpath-for-web-scraping-with-r.htm
-Rekkeviddetall <- "https://www.motor.no/aktuelt/motors-store-vintertest-av-rekkevidde-pa-elbiler/217132"  %>% 
+Tabell_1 <- "https://www.motor.no/aktuelt/motors-store-vintertest-av-rekkevidde-pa-elbiler/217132"  %>% 
   read_html() %>% 
   html_nodes(xpath = '/html/body/article/section/div[4]/div[4]/div[1]/table') %>% # henter inn tabellen ved å kopiere xpathen fra sidekildenen
   html_table(header = 1, fill = TRUE) %>% # setter at første rad blir header for hver kolonne 
@@ -29,14 +29,14 @@ Rekkeviddetall <- "https://www.motor.no/aktuelt/motors-store-vintertest-av-rekke
   theme_minimal()
 
 
-ggplotly(Rekkeviddetall) #henter tabellen gjennom ggplotly for å kunne se hvilke data hver enkelt plott har. 
+ggplotly(Tabell_1) #henter tabellen gjennom ggplotly for å kunne se hvilke data hver enkelt plott har. 
 
 
 
  
-lm(STOPP ~ WLTP, data = Rekkeviddetall$data) 
+lm(STOPP ~ WLTP, data = Tabell_1$data) 
 
-  ggplotly(Rekkeviddetall + geom_smooth(method = lm))
+  ggplotly(Tabell_1 + geom_smooth(method = lm))
   
 # Ved å se på koeffisient intervallet ser vi at for hver økninning av stopp på en vil wltp ha en økning på 0.8671. 
 # Ser vi fra den røde linja som viser et perfekt forhold mellom stopp og wltp er det en posetiv korrelasjon, men den ligger litt lavere ned 
