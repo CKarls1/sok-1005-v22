@@ -11,18 +11,11 @@ library(rlist)
 # https://datacornering.com/use-data-frame-row-as-a-column-names-in-r/
 # utgitte forelesninger i kurset
 
-
-
 #lager en liste med alle fagene vi har. SOK-1005, BED-2021, BED-2032
 # benytter de fag kodene jeg selv har da jeg har tre valgfag og ikke samme kursplan.
 Timeplan_URL <- list("https://timeplan.uit.no/emne_timeplan.php?sem=22v&module%5B%5D=SOK-1005-1&week=1-20&View=list", 
                      "https://timeplan.uit.no/emne_timeplan.php?sem=22v&module%5B%5D=BED-2032-1&View=list",
                      "https://timeplan.uit.no/emne_timeplan.php?sem=22v&module%5B%5D=BED-2021-1&View=list")
-
-
-
-
-
 
 Skrape_func <- function(url) {
   return(read_html(url) %>% 
@@ -42,7 +35,7 @@ Skrape_func <- function(url) {
                   Dag = strftime(Dato, format = "%A") )%>% # lager en ny variabel for dag så de tomme dataene blir fylt med riktig dag
            select(Dag,Dato,Uke,Tid,Rom, Lærer)) # velger det som skal inn i listen
 }
+Timeplan <- map(Timeplan_URL, Skrape_func) %>% 
+  bind_rows() %>% 
+  arrange(.$Dato, .$Tid)
 
-
-timeplan <- map(Timeplan_URL, Skrape_func) 
-timeplan
