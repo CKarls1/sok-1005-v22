@@ -48,6 +48,6 @@ def test_strategies(n_fields,n_battalions,player_strategy, computer_strategy):
     return r/n_tests
 
 
-#Blotto.run(6,100,player_strategy, computer_strategy)
+Blotto.run(6,100,player_strategy, computer_strategy)
 test = test_strategies(6,100,player_strategy, computer_strategy)
 print(test)
