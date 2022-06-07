@@ -1,0 +1,339 @@
+---
+title: "Prosjektoppgave"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: "Kandidatnummer 66 og 73"
+output:
+  pdf_document:
+  always_allow_html: true
+  toc: True
+  toc_depth: 3
+always_allow_html: true
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
++ Koder er insperert av tidligere arbeid, forelesnings koder i SOK_1005, https://towardsdatascience.com/business-analysis-in-r-part-1-advanced-filtering-and-conditional-calculations-c6b3ef7eb7a2
++ Laster inn datasett og pakker
+```{r Pakker og Data}
+
+library(tidyverse)
+library(lubridate)
+
+WEEKLY_WEATHER <- read.csv("WEEKLY_WEATHER.csv")
+WEEKLY_SALES_10STORES <- read.csv("WEEKLY_SALES_10STORES.csv")
+county_crime <- read.csv("county_crime.csv")
+county_demographic <- read.csv("county_demographic.csv")
+county_employment <- read.csv("county_employment.csv")
+AppWichStoreAttributes<- read.csv("AppWichStoreAttributes.csv")
+```
+\newpage
+
+## Oppgave 1
+
++ I Oppgave 1 har vi startet med å se på hvilke kolonner som samsvarer med de forskjellige datasettene til oppgaven. Enkelte kolonner har samme data, men forskjellige navn på kolonnen. Dette endrer vi slik at de kan slås sammen til ett større datasett. 
+
++ Dette gjør vi med **Store_Num**, **Date**, **Week** og **Store_County** sånn at de passer med de andre datasettene. Videre endrer vi på **Annual_Rent_Estimate** der den ene variabelen har ett komma som gjør at kolonnen blir til character. For å endre på dette bruker vi *gsub* som erstatter det vi ber den om for hele kolonnen. Her erstatter vi da kommaet med ingenting og gjør den om til numeric samtidig. **Weather_Date** endrer vi som sagt til **Date** slik at den samsvarer med **Date** i **WEEKLY_SALES_10STORES**. Parallelt gjør vi om begge fra *character* til *Date*. Dette gir oss mulighet til å kunne slå sammen alle datasettene til ett stort datasett. 
+ 
++ Når vi skal begynne å slå sammen datasettene finnes det en del metoder å gjøre dette på. *merge* og *left_join* er to metoder som vi mente fungerte best, men valgte å benytte bare *left_join*. Dette bestemte vi ettersom at *dplyr:join* funksjonene er raskere enn *merge* og informerer om hva de slår sammen med, samtidig var det en kode som var allsidig å jobbe med. Vi kjører koden og setter datasettene sammen ett datasett ved hjelp av **County_Name**. Ett datasett ved hjelp av  **Weather_Station** og **Date**. Tilslutt slår vi sammen disse to datasetten med **County_Name**  Dette gir et stort datasett på *79459 observasjoner* som tilsvarer det største datasettet **WEEKLY_SALES_10STORES** og vi får *72 variabler*. Dette datasettet har vi gitt navnet ***Data***. 
+
+```{r Data}
+AppWichStoreAttributes <- AppWichStoreAttributes %>% 
+  rename(Store_num = Store_Num,
+         Weather_Station = Store_Weather_Station) %>%
+  mutate(Annual_Rent_Estimate = as.numeric(gsub(",", "", Annual_Rent_Estimate)))
+
+WEEKLY_WEATHER <- WEEKLY_WEATHER %>%
+  mutate(Weather_Date=dmy(Weather_Date)) %>%
+  rename(Week = Weather_Week,
+         Date = Weather_Date)
+
+WEEKLY_SALES_10STORES <- WEEKLY_SALES_10STORES %>%
+  mutate(Date=mdy(Date))
+
+DF1 <- left_join(county_crime, county_demographic, by = 'County_Name') %>%
+  left_join(county_employment)
+
+DF2 <- left_join(AppWichStoreAttributes, WEEKLY_SALES_10STORES, by = 'Store_num') %>%
+  rename(County_Name = Store_County) %>%
+  left_join(WEEKLY_WEATHER)
+
+Data <- left_join(DF2, DF1)
+```
+\newpage
+
+## Oppgave 2
+
++ I oppgave to skal vi benytte datasettet til en ukentlig salgsrapport. En ukentlig salgsrapport skal samle informasjon om salg- og inntekts fremgang for bedriften. Vi tar datasettet og lager to nye variabler. En for ukentlig og en for månedlig estimert leiekostnad for å ha til videre analyse. Vi vil ta for oss ukentlig omsetning, kostnader og profitt for utsalgsstedet.
+```{r Data Uke og månedsleie}
+Data = Data %>%
+  mutate(Annual_Rent_Estimate = as.numeric(Annual_Rent_Estimate),
+         "Weekly rent" = Annual_Rent_Estimate/52) %>%
+  mutate(Annual_Rent_Estimate = as.numeric(Annual_Rent_Estimate),
+         "Monthly rent" = Annual_Rent_Estimate/12)
+```
+
++ Vi har laget en funskjon slik at en kan velge hvilket utsalgssted de vil analysere og hvilken uke de vil ha. Da får vi nye datasett for hver uke som vi vil analysere.
+```{r Utsalgssted funksjon}
+Utsalgssted <- function(data, x, y){ 
+  {{data}} %>%
+  filter(Store_Name == {{x}}, Week == {{y}})
+}
+```
+
+```{r Utsalgssted}
+PCS_17 <- Utsalgssted(Data, "Power City StripMall", 30)
+
+PCS_18 <- Utsalgssted(Data, "Power City StripMall", 31)
+```
+
++ Utsalgstedet vi har valgt å analysere er `r PCS_17$Store_Name[1]`. Vi skal se på uke `r PCS_18$Week[1]` og sammenligne med uken før, uke `r PCS_17$Week[1]`.
+
+
++ Vi lager en funskjon som summerer alle variabler sammen og får totalte verdier for gitt uke. Dette gjør vi for å ha en generell funksjon som kan brukes til andre analyser.
+```{r Funksjon Totalsum}
+TotalSUM <- function(a){
+  return(x <- (a) %>%
+        summarise('Total units sold' = sum(Sold), 'Total revenue' = sum(Sales),
+        'Total expenses' = sum(Cost),'Total Cost %' = sum(Cost_Percent),
+        'Total profit' = sum(Profit),'Total Margin' = sum(Margin),
+        'Weekly average rent' = `Weekly rent`[1],
+        'Week' = round(`Week`[1])))
+}
+```
++ Og vi får nye datasett som inneholder summen av beløpene vi vil analysere
+```{r SUM}
+SUM17=TotalSUM(PCS_17)
+SUM18=TotalSUM(PCS_18)
+
+SUMS = rbind(SUM17,SUM18) 
+knitr::kable((SUMS), caption = "Totale resultater på ukebasis",
+             align = "cccccccc" )
+```
+
++ Ut fra tabell 1 kan vi se på at det har vært en endring på `r SUM18[1]-SUM17[1]` enheter solgt på en uke som er en prosentvis endring på `r round((((SUM18[1]/SUM17[1])-1)*100),digits = 4)`%.
+
++ Totale inntekter har hatt en endring på `r round((SUM18[2]-SUM17[2]), digits = 4)` dollar som utgjør en prosentvis endring på `r round((((SUM18[2]/SUM17[2])-1)*100),digits = 4)`%. 
+
++ Totale kostnader eksludert leiekostnader hadde en endring på `r round((SUM18[3]-SUM17[3]), digits = 4)` dollar som utgjør en prosentvis endring på `r round((((SUM18[3]/SUM17[3])-1)*100),digits = 4)`%.
+
++ Total kostnad i prosent utgjor en marginal endring på `r SUM18[4]-SUM17[4]`
+
++ Total profit hadde en enring på `r round((SUM18[5]-SUM17[5]), digits = 4)` dollar som utgjør en prosentiv endring på `r round((((SUM18[5]/SUM17[5])-1)*100),digits = 4)`%.
+
+```{r TotalUKE funksjon}
+TotalUKE <- function(data, b){
+{{data}} %>%
+  ggplot(aes(Week,{{b}},fill=Week))+
+  geom_col(show.legend = FALSE,color="black")+
+  geom_text(aes(label=scales::comma({{b}})),
+              size=3,hjust=1.1,color="white")+
+      coord_flip()+
+  hrbrthemes::scale_x_comma(breaks = c(30,31))+
+    theme_classic()
+}
+```
+\newpage
+```{r Ukesalg enheter, fig.cap = "Sammenligning mellom totale enheter solgt per uke", out.width="80%", fig.align = 'center'}
+UkeSalg<-TotalUKE(SUMS,`Total units sold`) %>%
+  print()
+```
++ I Figur 1 viser vi grafisk hvor mye som selges totalt for `r PCS_17$Store_Name[1]`. Vi ser at butikken har en nedgang i salg for denne uken sammenlignet med forrige uke, som kan være påvirket av forskjellige faktorer. Det er viktig å se på hvor mye som selges hver uke sammenlignet med tidligere uker om det kommer en stor nedgang i salg må kanskje butikken gjøre endringer for å opprettholde salget. For `r PCS_17$Store_Name[1]` vil ikke denne nedgangen være bekymringsverdig da det er en liten nedgang fra forrige uke, men om trenden fortsetter må de gå dypere inn å se hva som forårsaker dette. 
+
+\newpage
+```{r Ukesalg profit, fig.cap = "Sammenligning mellom total profit per uke", out.width="80%", fig.align = 'center'}
+UkeSalg<-TotalUKE(SUMS,`Total profit`) %>%
+  print()
+```
++ I Figur 2 ser vi grafisk på forskjellen mellom uke 30 og 31 av total profitt. Fra figur 1 ser vi at salget har gått ned og derfor er det ikke overraskende at `r PCS_17$Store_Name[1]` har en lavere profitt denne uken heller. Det er viktig å presisere at vi ser her på Netto profitt, da kostnader som leie og lønnskostnader ikke er trekt fra. 
+
+\newpage
+```{r Ukesalg inntekter, fig.cap = "Sammenligning mellom total inntekter per uke", out.width="80%", fig.align = 'center'}
+UkeSalg<-TotalUKE(SUMS,`Total revenue`) %>%
+  print()
+```
++ Også i Figur 3 ser vi på den totale inntekten til butikken. Her også ser vi at det korrelerer med salget. Vi tar med alle disse grafene for å vise at salget gjenspeiler seg i gjennom alle ledd, og det er av salg en bedrift tjener profitt. Derfor er det viktig å passe på at salget opprettholdes og om det går ned kan enkle tiltak som rabatt kampanjer tiltrekke flere folk. Om det ikke fungerer må konsernledelsen gå dypere inn i butikken og se på andre faktorer som kostnader og gjøre en evaluering. 
+
+\newpage
+## Oppgave 3
+```{r Månedsdata funksjon}
+Månedsdata <- function(data,a){
+  {{data}} %>%
+  filter(Month == {{a}}) %>%
+  group_by(Store_Name, Store_Location,County_Name)%>%
+  summarise("Monthly revenue" = sum(Sales), "Monthly profit" = sum(Profit),
+            "Monthly expenses" = sum(Cost),
+            "Monthly rent" = median(`Monthly rent`)) %>%
+  select("Store Name" = Store_Name, "Store Location"= Store_Location,
+         "County" = County_Name,
+         "Monthly revenue", "Monthly expenses","Monthly profit","Monthly rent") %>%
+  as.data.frame() %>%
+    mutate("Monthly result after rent" = `Monthly profit` - `Monthly rent`,
+           'Percent profit of franchise profit' = 
+           scales::percent((`Monthly profit`/sum(`Monthly profit`))))
+}
+```
+\newpage
+```{r Månedlig data, fig.align='center', out.width="80%"}
+MånedligData <- Månedsdata(Data,7) %>%
+  arrange(.$`Store Name`)
+
+rownames(MånedligData) <- c(MånedligData$`Store Name`)
+
+
+knitr::kable((MånedligData %>% select(-c(`Store Name`))),
+             caption = "Månedlige resultater i Juli per butikk",
+             align = "lccccccccccccc") %>%
+  kableExtra::kable_styling(font_size = 10, latex_options = "scale_down")
+  
+```
+
++ I tabell 2 har vi sortert ut resultatene for Juli måned for hver enkelt butikk i franchisen. Her ser vi at det er Power city FreeStand som har størst månedlig inntekt, kostnad og profitt. Allikevel er det Littletown StripMall som har høyest samlet profittmargin av butikkene i franchisen. Dette skyldes av at kostnadene er lavere i forhold til salgs inntektene til denne butikken og de genererer mer profitt i forhold til de andre butikkene med tanke på forholdet mellom salg og kostnad.  
++ For Franchisen sin del er det interessant å se på at Big Box butikkene genererer vesentlig mindre profitt i prosent av franchisens totale profitt for juli måned. Sammenligner vi River City StripMall og University Town BigBox ligger disse i samme County, samtidig som University Town BigBox bare har 3 andre konkurrenter nær seg i forhold til River City StripMall som har 38. Allikevel har den nesten 1,5% mindre i andel profitt til franchisen. Det vi ser er at alle Big Box butikkene ligger ikke nær en skole, som gjør at de mister kunder som familier med skolebarn, og at det kan ligge litt i utkanten, som gjør det vanskeligere å besøke. Alle Big Box butikkene har under 9% som en franchiseleder burde ta hensyn til, om det finnes bedre muligheter.
++ Det å se på hvor mye hver butikk bidrar med profitt til franchisen hjelper konsernledelsen med å se hvor og hvilken butikk som trenger endringer og hvilken som går veldig bra. I tabellen kan vi se at begge butikkene i River county gir relativt lav profitt for franchisen samlet sett i forhold til de andre county´s som har to butikker. Siden begge butikkene har lav profitt andel og University Town BigBox har den laveste profitten av alle butikkene, vil vi anbefale konsernledelsen sette inn tiltak for å øke profitten, men siden den går i profitt vil det ikke være nødvendig å fjerne den. 
+\newpage
+```{r MånedligStores funksjon}
+MånedligStores <- function(data, x, y){
+  {{data}} %>%
+  mutate(Store=fct_reorder({{x}},{{y}})) %>%
+    ggplot(aes(Store,{{y}},fill={{x}}))+
+    geom_col(show.legend = FALSE,color="black")+
+    geom_text(aes(label=scales::comma({{y}})),
+              size=3,hjust=1.1,color="black")+
+    hrbrthemes::scale_y_comma()+
+    scale_fill_brewer(palette = "Paired")+
+    coord_flip()+
+    theme_classic()
+}
+```
+\newpage
+```{r Månedlig salg, fig.cap = "Totale inntekter i Juli måned for hver butikk", out.width="80%", fig.align = 'center'}
+Sales= MånedligStores(MånedligData, `Store Name`, `Monthly revenue`) %>%
+  print()
+```
++ I figur 4 ser vi på den månedlige inntekten til hver enkelt butikk i franchisen i stigene rekkefølge. Som Nevnt tidligere ser vi at Power city FreeStand har en mye høyere inntekt en de andre butikkene og at det er mer jevnt nedover på hvor mye hver enkelt tjener. Her får konsernledelsen et innblikk i hvor mye en måned tjener for hver enkelt butikk og hvilke butikker som har størst inntjening. 
+\newpage
+```{r Månedlig kostnad, fig.cap = "Total kostnad i Juli måned for hver butikk", out.width="80%", fig.align = 'center'}
+Profit= MånedligStores(MånedligData, `Store Name`, `Monthly expenses`) %>%
+  print()
+```
++ Vi mener det også er viktig å ha kontroll på hvor mye hver enkelt butikk har i kostnader for måneden. Vi ser at at figur 4 og figur 5 korrelerer med at de butikkene som tjener mest er også de med størst kostnader. dette er fordi de som tjener mest her mest salg og dermed trenger mer varer, og kostnader i dette tilfellet er kostnader for produktene de selger. Om man ser nøye på grafene kan vi se at det er noen av butikkene som er litt mer kostnadseffektive en andre i forhold til avstanden på inntekt og dermed kan generere litt mer profitt. 
+
+\newpage
+```{r Månedlig profit, fig.cap = "Total profit i Juli måned for hver butikk", out.width="80%", fig.align = 'center'}
+Profit= MånedligStores(MånedligData, `Store Name`, `Monthly profit`) %>%
+  print()
+```
++ Og som nevnt med profitt ovenfor ser vi her i figur 6 at sånn som North Tower StripMall og West Power StripMall kommer nærmere den butikken med mer inntekt i profitt, da dette skyldes lavere kostnader. For konsernledelsen er det interessant om de vil se nærmere på hvorfor disse butikkene klarer å være mer kostnadsbesparende enn de andre butikkene. 
+\newpage
+```{r Månedlig profit after rent, fig.cap = "Total profit etter leie i Juli måned for hver butikk", out.width="80%", fig.align = 'center'}
+Profit= MånedligStores(MånedligData, `Store Name`, `Monthly result after rent`) %>%
+  print()
+```
++ Ved å trekke fra leiekostnadene for hver butikk av profitten kan man få en slags brutto profitt, det skal nevnes at vi ikke har med lønnskostnader som gjør at det ikke blir helt nøyaktig bruttoprofitt. Her ser vi at det er noen av butikkene som har så høye leiekostnader at rekkefølgen på hvem som har meest profitt og hvem som har mest profitt etter leiekostnader endres. West Power har så høye leiekostnader at de havner nest nederst mens Rail City klatrer to plasser. for en franchise er det viktig å ha lave kostnader og leiekostnader er ofte en av de største kostnadene. Derfor mener vi det er viktig å se på hvor mye denne kostnaden tar av total profitt av en hel måned. og vi ser at de butikkene med høy profitt har også relativt høye leiekostnader som kan komme av at de har en god lokasjon de må betale mer for, men i gjengjeld får de intjening som gir høy profitt av dette også. 
+
+\newpage
+```{r Månedlig salg per type butikk, fig.cap = "Månedlig salg per type butikk i Juli måned", out.width="80%", fig.align = 'center'}
+MånedligData%>% 
+  mutate(Store=fct_reorder(`Store Location`, `Monthly result after rent`)) %>% 
+  ggplot(aes(Store,`Monthly result after rent`,fill=`Store Name`))+
+  geom_col(show.legend = TRUE ,color="black") +
+  geom_text(aes(label=scales::comma(`Monthly result after rent`)),
+            size=2.5,position = position_stack(vjust = 0.5),color="black")+
+  hrbrthemes::scale_y_comma()+
+  scale_fill_brewer(palette = "Paired")+
+  coord_flip()+
+  theme_classic()
+```
++ Her kan vi se hvor mye de forskjellige butikkene har i profitt etter leiekostnad for hvilken type butikk de er. Som nevnt tidligere er Big Box en type butikk som gir minst profitt generelt sett, men vet er to StripMall´s som har på lik linje profitt som Big Box etter leiekostnad. Dette er da henholdsvis West Power StripMall som ikke ligger nær noe skole og går gantagelig glipp av mange kunder på dette aspektet, også er det River City StripMall som har veldig få innbyggere og masse konkurranse rundt seg. FreeStand er den som tjener mest, men etter leiekostnader synker profitten masse ettersom leien der er høy.
+
+\newpage
+## Oppgave 4
+```{r Årlig resultat funksjon}
+årTall<- function(data){
+  {{data}} %>%
+  group_by(Store_Name, Store_Location,County_Name,Annual_Rent_Estimate,
+           County_Total_Census_Pop)%>%
+  summarise("Revenue" = sum(Sales), "Profit" = sum(Profit),
+            "Expenses" = sum(Cost))%>%
+  select("Store Name" = Store_Name, "Store Location"= Store_Location,
+         "County" = County_Name,
+         "Revenue", "Expenses","Profit",
+         "Annual Rent" = Annual_Rent_Estimate,
+         County_Total_Census_Pop)%>%
+  as.data.frame() %>%
+    mutate(
+           "Result after rent" = Profit - `Annual Rent`,
+           "Dollar profit per 1000 Citizen" = 
+             (`Result after rent`*1000)/County_Total_Census_Pop,
+           'Percent profit of franchise profit' = 
+           scales::percent((`Profit`/sum(`Profit`)))) %>%
+    select(-c(County_Total_Census_Pop))
+}
+```
+
+```{r Årlig statistikk funksjon}
+årStatistikk <- function(data){
+  {{data}} %>%
+  group_by(Store_Name,
+           County_Total_Crime_Rate, Store_Near_School,County_Total_Census_Pop,
+           Store_Competition_Otherfood, Store_Competition_Fastfood,
+           Store_Drive_Through, County_Unemployment_Rate, Store_Traveller_Clients)%>%
+    summarise() %>%
+  select("Store Name" = Store_Name, 
+         "County Population" = County_Total_Census_Pop,
+         "Unemployment Rate" = County_Unemployment_Rate,
+         "Total Crime Rate"= County_Total_Crime_Rate,
+         "Drive Through?" = Store_Drive_Through,
+         "Near School?" = Store_Near_School,
+         "Travelling Clients?" = Store_Traveller_Clients,
+         Store_Competition_Otherfood, Store_Competition_Fastfood) %>%
+  as.data.frame() %>%
+    mutate("Total competitors" = Store_Competition_Otherfood + Store_Competition_Fastfood) %>%
+        select(-c(Store_Competition_Otherfood, Store_Competition_Fastfood))
+}
+```
+
+
+```{r Årlig tall og årlig Statistikk}
+årligTall <- årTall(Data) %>%
+  arrange(.$`Store Name`)
+
+årligStat <- årStatistikk(Data) %>%
+  arrange(.$`Store Name`)
+```
+
+```{r Dårlig vær dataframe og}
+Weather <- left_join(AppWichStoreAttributes, WEEKLY_WEATHER, by = 'Weather_Station')%>%
+  rename(County_Name = Store_County) %>%
+  select("Store Name" = Store_Name,"Bad Weather Days" = Weather_Bad_Weather_days) %>%
+  group_by(`Store Name`) %>%
+  summarise("Bad Weather Days" = sum(`Bad Weather Days`))
+
+årligStat <- left_join(årligStat, Weather)
+```
+
+```{r Finpuss på årlig statisikk og årlig tall}
+rownames(årligTall) <- c(årligTall$`Store Name`)
+rownames(årligStat) <- c(årligStat$`Store Name`)
+
+årligTall <- årligTall %>%
+  select(-c(`Store Name`))
+
+årligStat <- årligStat %>%
+  select(-c(`Store Name`))
+```
+\newpage
+```{r Siste tabeller}
+knitr::kable((årligTall),caption = "Årlig resultat",
+             align = "ccccccccccc") %>%
+  kableExtra::kable_styling(font_size = 10, latex_options = "scale_down")
+
+knitr::kable((årligStat),caption = "Statistikk for året",
+             align = "ccccccccccc") %>%
+  kableExtra::kable_styling(font_size = 10, latex_options = "scale_down")
+```
+
++ Når vi ser på dataene for å se etter nytt utsalgssted for konsernledelsen har vi satt sammen to tabeller, tabell 3 og tabell 4, som kan gi oss innblikk i hvilke steder som samlet sett vil være positivt for konsernet å åpne ny butikk på. Det første vi så på var hvilket county som hadde høyest dollar profit per 1000 innbygger og i tabellen ser vi at Farm county ligger på topp og tredjeplass med to butikker, samtidig generere North Town StripMall nest høyest profitt av den totale profitten til franchisen. Videre har vi sett på arbeidsledighets raten for alle stedene, og spesielt til Farm county. Der kommer River county opp på topp, men Farm county har nest lavest arbeidsledighets rate. Dette ser vi på som positivt med tanke på at det er et county som har innbyggere med inntekt og dette er viktig om man ser på et nytt sted å starte opp en butikk. Hadde det vært høy arbeidsledighets rate, er det mindre av befolkningen som er villig til å bruke penger på franchisekjeden og det vil påvirke resultatet. Samtidig er en lav arbeidsledighet et tegn på at det er få arbeidsuføre, og at det er få som ikke aktivt søker jobb. Derfor vil ikke det å kunne ansette nye arbeidere og bidra til flere arbeidsplasser være en bekymring. 
++ Ved å se nærmere på farm county kan vi evaluere litt nærmere hvilken type butikk de burde starte opp og om det er noen elementer som vi hjelpe få profitten til butikken og franchisen.  Fra figur 7 i oppgave tre ser vi at majoriteten til butikkene i franchisen er StripMalls og at de har gjennomsnittlig høyere profitt etter leiekostnader en det BigBox butikkene har. Siden det bare er en FreeStand butikk i hele kjeden kan dette indikere at det ikke er like enkelt å finne tilgjengelige butikker av dette formatet, men siden den i Power City har så høy profitt vil vi anbefale konsernledelsen å se etter muligheten for en Freestand i Farm county. Om det ikke er tilgjengelig vil et StripMall være det beste alternativet. Om butikken burde ha en Drive-through ser vi at de to butikkene Power city og Lake City som har det har ganske høy profitt og profitt per 1000 innbygger. Og trekker vi med antall dager med dårlig vær så har Farm county en tredjedel av året med dårlig vær, da kan en drive-through hjelpe med å øke salget siden man slipper å gå ut av bilen for å få mat. Til slutt burde de legge butikken nær en skole, siden det viser positiv korrelasjon på de butikkene som er nærme skoler og profitt. Dette gir en kundegruppe som inneholder flere barnefamilier, samt at fra dataene ser vi at Farm county har reisende kunder som gir en økning i kundegruppen til de innbyggerne som allerede er der.  
++ For å summere opp vil vi anbefale konsernledelsen å starte opp en ny butikk i Farm county og se etter et lokale med drive-through som er nær skole iform av enten Freestand eller StripMall.  
+
